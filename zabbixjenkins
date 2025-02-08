@@ -1,0 +1,51 @@
+pipeline {
+    agent any
+
+    environment {
+        DEPLOY_SCRIPT = 'zabbix_deploy.sh'  // The deployment script
+        TARGET_SERVER = 'your_server_ip'  // Target server IP or hostname
+        SSH_CREDENTIALS = 'your-ssh-credentials-id'  // The Jenkins credentials ID for SSH
+    }
+
+    stages {
+        stage('Clone Repository') {
+            steps {
+                // If you store the script in a repository (Git, SVN, etc.), clone it
+                git 'https://github.com/your-repository/zabbix-deployment-scripts.git'
+            }
+        }
+
+        stage('Deploy Zabbix') {
+            steps {
+                script {
+                    // Ensure the script is executable
+                    sh 'chmod +x $DEPLOY_SCRIPT'
+
+                    // Use SSH to run the script on the target server
+                    sshagent(['$SSH_CREDENTIALS']) {
+                        sh "scp $DEPLOY_SCRIPT user@$TARGET_SERVER:/tmp/$DEPLOY_SCRIPT"
+                        sh "ssh user@$TARGET_SERVER 'bash /tmp/$DEPLOY_SCRIPT'"
+                    }
+                }
+            }
+        }
+
+        stage('Verify Installation') {
+            steps {
+                script {
+                    // Verify Zabbix server status
+                    sh "ssh user@$TARGET_SERVER 'systemctl status zabbix-server'"
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Zabbix deployment succeeded!'
+        }
+        failure {
+            echo 'Zabbix deployment failed.'
+        }
+    }
+}
